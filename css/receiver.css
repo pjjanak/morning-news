@@ -1,0 +1,53 @@
+body {
+	font-family: sans-serif;
+	background: black;
+	margin: 35px 65px;
+}
+
+.viewport {
+	width: 100%;
+	height: 100%;
+}
+
+.messages {
+	position: absolute;
+	margin-top: 50%;
+	margin-left: 50%;
+	left: -137px;
+	top: -350px;
+	height: 700px;
+	width: 274px;
+	transition: opacity 1s;
+}
+
+.card {
+	float: left;
+	margin-right: 10px;
+	margin-bottom: 20px;
+	background: #FFF;
+	box-shadow: 5px 5px 6px #888888;
+	opacity: 0;
+	font-size: 20px;
+	color: #000;
+	transition: opacity 1s;
+}
+
+.card > .content {
+	margin: auto;
+	text-align: center;
+	width: 100%;
+	height: 100%;
+}
+
+.card > .content.map {
+	margin-top: 0;
+}
+
+.card > .content.weather {
+	font-size: 55px;
+}
+
+.weather-icon {
+	font-size: 100px;
+	font-family: "MeteoconsRegular";
+}
