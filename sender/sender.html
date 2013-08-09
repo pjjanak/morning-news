@@ -4,6 +4,9 @@
 		<link rel="stylesheet" type="text/css" href="../css/sender.css" />
 	</head>
 	<body>
+		<div class="login-div">
+			<button class="login">Login to Google</button>
+		</div>
 		<div class="receiver-div">
 			<h3>Choose A Receiver</h3>
 			<ul class="receiver-list">
@@ -13,13 +16,14 @@
 		<div class="card-options">
 			<h3>Choose your Cards</h3>
 			<ul class="card-list">
-				<li><input type="checkbox" value="weather" class="card-option">Local Weather</input></li>
-				<li><input type="checkbox" value="stocks" class="card-option">Your Stocks</input></li>
-				<li><input type="checkbox" value="appointments" class="card-option">Today's Appointments</input></li>
-				<li><input type="checkbox" value="traffic" class="card-option">Local Traffic</input></li>
+				<li><input type="checkbox" value="weather" class="card-option" disabled>Local Weather</input></li>
+				<li><input type="checkbox" value="stocks" class="card-option needs-auth" disabled>Your Stocks</input>*</li>
+				<li><input type="checkbox" value="appointments" class="card-option needs-auth" disabled>Today's Appointments</input>*</li>
+				<li><input type="checkbox" value="traffic" class="card-option" disabled>Local Traffic</input></li>
 			</ul>
+			* Requires Authorization<br/><br/>
 		</div>
-		<input type="time" class="wake-time" />
+		<input type="datetime-local" class="wake-time" />
 		<input type="number" class="fade-time" value="1" /> Fade Time (in minutes)
 		<button class="set" disabled>Set Alarm</button><br/>
 		<input type="number" class="snooze-duration" value="10" /> Snooze Time (in minutes) <button class="snooze" disabled>Snooze</button><br/>
@@ -31,151 +35,6 @@
 	<script src="http://underscorejs.org/underscore-min.js"></script>
 	<script src="https://rawgithub.com/timrwood/moment/2.1.0/min/moment.min.js"></script>
 	<script src="../js/messageTypes.js"></script>
+	<script src="../js/sender.js"></script>
 
-	<script>
-		var cast_api,
-			cv_activity,
-			receiverList,
-			$killSwitch = $('.kill'),
-			$snooze = $('.snooze'),
-			$wake = $('.wake'),
-			$startSwitch = $('.set'),
-			$wakeTime = $('.wake-time'),
-			$fadeTime = $('.fade-time'),
-			$snoozeDuration = $('.snooze-duration'),
-			showCardsTimer = null,
-			positionObject = null;
-
-		navigator.geolocation.getCurrentPosition(function(pos) {
-			positionObject = {latitude: pos.coords.latitude, longitude: pos.coords.longitude};
-		});
-	
-		$wakeTime.val(moment().format('HH:mm'));
-
-		window.addEventListener('message', function(event) {
-			if (event.source === window && event.data &&
-					event.data.source === 'CastApi' &&
-					event.data.event === 'Hello') {
-				initializeApi();
-			}
-		});
-
-		initializeApi = function() {
-			if (!cast_api) {
-				cast_api = new cast.Api();
-				cast_api.addReceiverListener('*** CHROMECAST APP ID ***', onReceiverList);
-			}
-		};
-
-		onReceiverList = function(list) {
-			if (list.length > 0) {
-				receiverList = list;
-				$('.receiver-list').empty();
-				receiverList.forEach(function(receiver) {
-					$listItem = $('<li><input type="checkbox" value="' + receiver.id + '" class="receiver-option">' + receiver.name + '</input></li>');
-					$listItem.on('click', handleReceiverChecked);
-					$('.receiver-list').append($listItem);
-				});
-			}
-		};
-
-		doLaunch = function(receiver) {
-			if (!cv_activity) {
-				var request = new cast.LaunchRequest('*** CHROMECAST APP ID ***', receiver);
-
-				$killSwitch.prop('disabled', false);
-				$snooze.prop('disabled', false);
-				$wake.prop('disabled', false);
-
-				cast_api.launch(request, onLaunch);
-			}
-		};
-
-		onLaunch = function(activity) {
-			if (activity.status === 'running') {
-				cv_activity = activity;
-				cast_api.sendMessage(cv_activity.activityId, 'MorningNews', {type: MessageType.BEGIN, fadeTime: $fadeTime.val() * 60});
-				//startShowCardsTimer($fadeTime.val() * 60000);
-			}
-		};
-
-		handleReceiverChecked = function(e) {
-			$startSwitch.prop('disabled', false);
-		};
-
-		alarmWillSound = function() {
-			var $target = $('.receiver-option:checked'),
-				receiver = _.find(receiverList, function(receiver) {
-					return receiver.id === $target.val();
-				});
-
-			doLaunch(receiver);
-		};
-
-		startShowCardsTimer = function(timeout) {
-			var showNewsTimer = setTimeout(function() {
-				showCards();	
-			}, timeout);
-		};
-
-		showCards = function() {
-			var cardsArr = [],
-				$cardOptions = $('.card-option:checked');
-
-			_.each($cardOptions, function(cardOption) {
-				cardsArr.push($(cardOption).val());
-			});
-
-			cast_api.sendMessage(cv_activity.activityId, 'MorningNews', {
-				type: MessageType.SHOW_CARDS,
-				position: positionObject,
-				cards: cardsArr
-			});
-			showCardsTimer = null;
-		};
-
-		$startSwitch.on('click', function() {
-			var now = moment(),
-				timeVal = $wakeTime.val();
-				timeArray = timeVal.split(':'),
-				then = moment();
-
-			then.hour(timeArray[0]);
-			then.minute(timeArray[1]);
-
-			$startSwitch.prop('disabled', true);
-
-			setTimeout(alarmWillSound, then.diff(now));
-		});
-
-		$killSwitch.on('click', function() {
-			cast_api.stopActivity(cv_activity.activityId, function(){});
-			cv_activity = null;
-			
-			$killSwitch.prop('disabled', true);
-			$snooze.prop('disabled', true);
-			$wake.prop('disabled', true);
-			$startSwitch.prop('disabled', false);
-		});
-
-		$snooze.on('click', function() {
-			cast_api.sendMessage(cv_activity.activityId, 'MorningNews', {type: MessageType.SNOOZE});
-			$snooze.prop('disabled', true);
-
-			setTimeout(function() {
-				cast_api.sendMessage(cv_activity.activityId, 'MorningNews', {type: MessageType.RESUME});
-				$snooze.prop('disabled', false);
-			}, $snoozeDuration.val() * 60000);
-		});
-
-		$wake.on('click', function() {
-			$snooze.prop('disabled', true);
-			$wake.prop('disabled', true);
-
-			clearTimeout(showCardsTimer);
-			showCards();
-
-			cast_api.sendMessage(cv_activity.activityId, 'MorningNews', {type: MessageType.WAKE});
-		});
-	</script>
 </html>
